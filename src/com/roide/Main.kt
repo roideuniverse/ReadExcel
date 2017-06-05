@@ -1,11 +1,13 @@
 package com.roide
 
+import org.apache.poi.ss.usermodel.CellType
 import org.apache.poi.ss.usermodel.Sheet
 import org.apache.poi.xssf.usermodel.XSSFWorkbook
 import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
 import java.text.SimpleDateFormat
+import java.util.*
 import kotlin.collections.ArrayList
 
 
@@ -15,13 +17,20 @@ import kotlin.collections.ArrayList
 
 private val FIRST_ROW_WITH_DATA = 3
 private val dateFormatter = SimpleDateFormat("dd/MM/yyyy")
+private val DEBUG = false
 
 fun main(args: Array<String>) {
 
-  val parsedArgs = parseInput(args) ?: return
-
-  val filePath = parsedArgs.first
-  val filterPartyName = parsedArgs.second
+  var filePath : String = ""
+  var filterPartyName: String = ""
+  if (!DEBUG) {
+    val parsedArgs = parseInput(args) ?: return
+    filePath = parsedArgs.first
+    filterPartyName = parsedArgs.second
+  } else {
+    filePath = "/Users/ks/Desktop/files/RPT500EKPC.xlsx"
+    filterPartyName = "All Ent. over which KMP have control/SI"
+  }
 
   val file = File(filePath)
   val dirName = file.parentFile
@@ -35,9 +44,12 @@ fun main(args: Array<String>) {
   val sheetIterator = readWorkbook.sheetIterator()
   while (sheetIterator.hasNext()) {
     val sheet = sheetIterator.next()
+    //println(sheet.sheetName)
+
     val sheetReader = SheetReader(sheet)
-    val entries = sheetReader.read().filter { it.partyName == filterPartyName }
-    //println(sheet.sheetName + "::size=" + entries.size)
+    val entries = sheetReader.read().filter {
+      it.partyName == filterPartyName
+    }
     val result = query(entries)
     // println(result.size)
     val newSheet = writeWordbook.createSheet(sheet.sheetName)
@@ -136,22 +148,35 @@ fun writeToSheet(sheet: Sheet, data: Map<Triple<String, String, String>, Pair<En
 
 class SheetReader(excelSheet: Sheet) {
   val sheet = excelSheet
+
   fun read(): List<Entry> {
     val iterator = sheet.rowIterator()
     for (i in 0..FIRST_ROW_WITH_DATA) {
-      iterator.next()
+      if (iterator.hasNext()) {
+        iterator.next()
+      } else {
+        return Collections.emptyList()
+      }
     }
 
     var prevCompanyName = ""
+    var prevDate : String = ""
+    var prevPartyType : String = ""
     val entryList = ArrayList<Entry>()
     while (iterator.hasNext()) {
       val row = iterator.next()
       val companyName = if (row.getCell(0) != null) row.getCell(0).stringCellValue else prevCompanyName
       prevCompanyName = companyName
-      val date = row.getCell(1)?.dateCellValue ?: continue
-      val entryDate = dateFormatter.format(date)
-      val partyType = row.getCell(3).stringCellValue
-      val partyName = row.getCell(4).stringCellValue
+
+      val tempVal = row.getCell(1)
+      val type = tempVal?.cellTypeEnum
+      val entryDate = if (type == CellType.NUMERIC) dateFormatter.format(row.getCell(1).dateCellValue) else prevDate
+      prevDate = entryDate
+
+      val partyType = if (row.getCell(3) != null) row.getCell(3).stringCellValue else prevPartyType
+      prevPartyType = partyType
+
+      val partyName = if (row.getCell(4) != null) row.getCell(4).stringCellValue else continue
       val transactionValue = row.getCell(7).numericCellValue
 
       val expression = row.getCell(5).stringCellValue
