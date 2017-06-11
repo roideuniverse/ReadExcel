@@ -39,7 +39,7 @@ fun main(args: Array<String>) {
   val excelFileInputStream = FileInputStream(file)
   val readWorkbook = XSSFWorkbook(excelFileInputStream)
 
-  val writeWordbook = XSSFWorkbook();
+  val writeWordbook = XSSFWorkbook()
 
   val sheetIterator = readWorkbook.sheetIterator()
   while (sheetIterator.hasNext()) {
